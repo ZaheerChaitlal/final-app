@@ -3,6 +3,7 @@ import cors from "cors";
 import 'dotenv/config';
 import { connect } from "mongoose";
 import session from "express-session";
+import MongoStore from "connect-mongo";
 import passport from "passport";
 import articleRouter from "./routes/articles.js";
 import "./auth/googleAuth.js";
@@ -23,11 +24,23 @@ app.use(cors({
 // Parse incoming JSON
 app.use(express.json());
 
-// Session middleware
+const connectDB = async () => {
+  try {
+    await connect(process.env.MONGO_URI);
+    console.log('MongoDB Connected successfully');
+  } catch (err) {
+    console.error('MongoDB Connection Error:', err.message);
+  }
+};
+await connectDB();
+
+// Session middleware using MongoStore for production-safe sessions
 app.use(session({
   secret: process.env.SESSION_SECRET || 'yourSecretHere',
   resave: false,
-  saveUninitialized: true,
+  saveUninitialized: false,
+  store: MongoStore.create({ mongoUrl: process.env.MONGO_URI }),
+  cookie: { maxAge: 1000 * 60 * 60 * 24 }, // 1 day
 }));
 
 // Initialize passport and session handling
@@ -58,16 +71,6 @@ app.get('/auth/logout', (req, res) => {
     res.redirect('/');
   });
 });
-
-const connectDB = async () => {
-  try {
-    await connect(process.env.MONGO_URI);
-    console.log('MongoDB Connected successfully');
-  } catch (err) {
-    console.error('MongoDB Connection Error:', err.message);
-  }
-};
-connectDB();
 
 app.get("/", (req, res) => {
   res.send("Hello from the server");
